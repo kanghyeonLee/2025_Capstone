@@ -16,14 +16,24 @@ void error_handling(char *message){
     exit(1);
 }
 
+typedef struct 
+{
+    unsigned int mode;
+    unsigned char msg[BUF_SIZE];
+}pkt_t;
+
+
 int main(int argc, char *argv[]){
     int serv_sock;
     int clnt_sock;
     struct sockaddr_in serv_addr;
     struct sockaddr_in clnt_addr;
     socklen_t clnt_addr_size;
-
-    int fd;
+    pkt_t * recv_pkt;
+    pkt_t * send_pkt;
+    FILE* fp;
+    DIR * dp;
+    struct dirent *d;
     int read_cnt;
 
     char message[BUF_SIZE];
@@ -33,7 +43,7 @@ int main(int argc, char *argv[]){
         printf("Usage: %s <port>\n",argv[0]);
         exit(1);
     }
-
+    // socket 생성 과정 
     serv_sock = socket(PF_INET, SOCK_STREAM, 0);
     if(serv_sock == -1)
         error_handling("socket() error");
@@ -48,49 +58,61 @@ int main(int argc, char *argv[]){
 
     if(listen(serv_sock, 5) == -1)
         error_handling("listen() error");
-    
-    while (1)
-    {
-        clnt_addr_size = sizeof(clnt_addr);
-        clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
-        if(clnt_sock == -1)
+    clnt_addr_size = sizeof(clnt_addr);
+    clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
+    if(clnt_sock == -1)
             error_handling("accept() error");
-        DIR *dp = opendir(".");
-        if(dp == NULL)
-            error_handling("opendir() error");
-        struct dirent *d;
-        while ((d = readdir(dp)) != NULL)
+    // 메뉴에 따른 요청 처리 과정 시작 
+    recv_pkt = (pkt_t *) malloc(sizeof(pkt_t));
+    int read_len;
+    while((read_len = read(clnt_sock,recv_pkt,sizeof(pkt_t)))!=0)
+    {
+        send_pkt = (pkt_t *) malloc(sizeof(pkt_t));
+        send_pkt->mode = recv_pkt->mode;
+        printf("Mode %d\n",recv_pkt->mode);
+        switch (recv_pkt->mode)
         {
-            if(!strcmp(d->d_name,".") || !strcmp(d->d_name,".."))
-                continue;
-            struct stat file_stat;
-            if(stat(d->d_name,&file_stat) == -1)
-                error_handling("stat() error");
-            sprintf(message,"%s %lldbytes\n",d->d_name,file_stat.st_size);
-            write(clnt_sock,message,sizeof(message));
-        }
-        closedir(dp);
-        shutdown(clnt_sock, SHUT_WR);
-        read(clnt_sock,message,sizeof(message));
-        if(!strcmp(message,"/end")){
-            printf("end of connection\n");
+        case 0:
+            dp = opendir(".");
+            if(dp == NULL)
+                error_handling("opendir() error");
+            while ((d = readdir(dp)) != NULL)
+            {
+                if(!strcmp(d->d_name,".") || !strcmp(d->d_name,".."))
+                    continue;
+                struct stat file_stat;
+                if(stat(d->d_name,&file_stat) == -1)
+                    error_handling("stat() error");
+                sprintf(message,"%s %lld\n",d->d_name,file_stat.st_size);
+                strcat(send_pkt->msg,message);
+            }
+            closedir(dp);
+            write(clnt_sock,send_pkt,sizeof(pkt_t));
+            break;
+        case 1:
+            fp = fopen(recv_pkt->msg,"rb");
+            while (1)
+            {
+                read_cnt = fread(buf,1,BUF_SIZE,fp);
+                if(read_cnt < BUF_SIZE){
+                    write(clnt_sock,buf,read_cnt);
+                    break;
+                }
+                write(clnt_sock,buf,BUF_SIZE);
+            }
+            fclose(fp);
+            break;
+        case 2:
             close(clnt_sock);
+            clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
+            if(clnt_sock == -1)
+                    error_handling("accept() error");
+            break;
+        default:
+            printf("Undefined mode!\n");
             break;
         }
-        fd = open(message,O_RDONLY);
-        close(clnt_sock);
-        clnt_addr_size = sizeof(clnt_addr);
-        clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
-        while (1)
-        {
-            read_cnt = read(fd,buf,BUF_SIZE);
-            if(read_cnt < BUF_SIZE){
-                write(clnt_sock,buf,read_cnt);
-                break;
-            }
-            write(clnt_sock,buf,BUF_SIZE);
-        }
-        close(clnt_sock);
     }
+    
     close(serv_sock);
 }
