@@ -7,7 +7,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #define BUF_SIZE 1024
-#define SEQ_SIZE 1000
+#define SEQ_SIZE 4000
 
 void error_handling(char *message){
     printf("%s\n",message);

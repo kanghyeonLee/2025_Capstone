@@ -8,11 +8,10 @@
 #include <sys/time.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <time.h>
 #include <errno.h>
 
 #define BUF_SIZE 1024
-#define SEQ_SIZE 1000
+#define SEQ_SIZE 4096
 
 void error_handling(char *message){
     printf("%s\n",message);
@@ -30,7 +29,6 @@ typedef struct{
 typedef struct{
     unsigned int seq;
     unsigned int data_size;
-    unsigned int loss;
     char data[SEQ_SIZE];
 }seq_t;
 
@@ -46,7 +44,8 @@ int main(int argc, char *argv[])
     struct timeval timeout;
     timeout.tv_sec = 0;
     timeout.tv_usec = 0;
-    clock_t start, finish;
+    double start, finish;
+    struct timeval time;
     double duration;
     double throughput;
     FILE*fp;
@@ -133,27 +132,30 @@ int main(int argc, char *argv[])
                 if(fread(seqt->data,1,seqt->data_size,fp) == -1)
                     error_handling("fread() error");
             
-                if(i==0)
-                    start = clock();
+                if(i==0){
+                    gettimeofday(&time,NULL);
+                    start = time.tv_sec*1000000 + time.tv_usec;
+                }
                 sendto(serv_sock,seqt,sizeof(seq_t),0,(struct sockaddr*)&clnt_adr,clnt_adr_sz);
                 while(recvfrom(serv_sock,recv_pkt,sizeof(pkt_t),0,(struct sockaddr*)&clnt_adr,&clnt_adr_sz)==-1){
                     if(errno == EAGAIN || errno == EWOULDBLOCK){
                         printf("%d. Packet loss and Time out! (Processing %.2f%%)\n",cnt++, (seqt->data_size*(i+1))/((double)filesize)*100);
-                        seqt->loss = 1;
                         sendto(serv_sock,seqt,sizeof(seq_t),0,(struct sockaddr*)&clnt_adr,clnt_adr_sz);
                     }else{
                         error_handling("recvfrom() error");
                     }
                 }
-                if(i+1 == count)
-                    finish = clock();
+                if(i+1 == count){
+                    gettimeofday(&time,NULL);
+                    finish = time.tv_sec*1000000 + time.tv_usec;
+                }
+                    
                 i++;
             }
             fclose(fp);
-            duration = ((double)(finish - start))/CLOCKS_PER_SEC;
-            
+            duration = (finish - start)/1000000;
             throughput = filesize/(double)duration;
-            printf("'%s'-%dbytes throughput: %.4lfB/s\n",filename,filesize,throughput);
+            printf("'%s'-%dbytes throughput: %.4lfB/s (filesize:%d, duration:%.4lf)\n",filename,filesize,throughput,filesize,duration);
             timeout.tv_sec = 0;
             timeout.tv_usec = 0;
             break;
