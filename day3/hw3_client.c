@@ -40,17 +40,8 @@ int main(int argc, char *argv[]){
         memset(clnt_file[i],0,sizeof(pkt_t));
     }
 
-    data->mode=0;
-    write(sock,data,sizeof(pkt_data));
-    read(sock,&length,sizeof(int));
-    read(sock,cwd,sizeof(cwd));
-    printf("\nCurrent Directory: %s\n",cwd);
-    printFileList(file_list,length,sock);
-    printf("Execute command ('exit' command is to quit the process)\n");
-    data->mode=1;
-    while (strcmp(data->cmd,"exit"))
+    while (1)
     {
-        write(sock,data,sizeof(pkt_data));
         printf("cmd> ");
         fgets(data->cmd,sizeof(data->cmd),stdin);
         data->cmd[strlen(data->cmd)-1] = '\0';
@@ -62,6 +53,8 @@ int main(int argc, char *argv[]){
         if(cmd_mode == 0 || cmd_mode == 1){
             read(sock,result,sizeof(result));
             printf("%s",result);
+            if(cmd_mode == 1)
+                break;
         }else if(cmd_mode == 2){
             read(sock,&length,sizeof(int));
             read(sock,cwd,BUF_SIZE);
@@ -88,8 +81,6 @@ int main(int argc, char *argv[]){
             printf("%s",result);
         }
     }
-    data->mode=2;
-    write(sock,data,sizeof(pkt_data));
     close(sock);
     for(i=0; i<length; i++){
         free(file_list[i]);

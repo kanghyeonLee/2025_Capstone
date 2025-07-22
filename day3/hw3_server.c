@@ -71,26 +71,18 @@ int main(int argc, char *argv[]){
                     clnt_sock = accept(serv_sock,(struct sockaddr*)&clnt_addr,&adr_sz);
                     FD_SET(clnt_sock,&reads);
                     fd_max = fd_max < clnt_sock ? clnt_sock : fd_max;
+                    getcwd(current_d[clnt_sock],sizeof(current_d[clnt_sock]));
                     printf("connected client: %d\n",clnt_sock);
                 }
                 else
                 {
-                    read(i,data,sizeof(pkt_data));
-                    if(data->mode == 0){
-                        getcwd(cwd,sizeof(cwd));
-                        strcpy(current_d[i],cwd);
-                        *length_of_list = viewFileList_server(i,file_list,current_d);
-                        write(i,length_of_list,sizeof(int));
-                        write(i,cwd,sizeof(cwd));
-                        for(int j=0; j<*length_of_list; j++)
-                            write(i,file_list[j],sizeof(pkt_t));
-                    }else if(data->mode == 1){
-                        read(i,cmd_data,sizeof(cmd_d));
-                        int c;
-                        write(i,&c,sizeof(int));
-                        read(i,cmd_data->cmd2,sizeof(cmd_data->cmd2));
-                        handlingCmd_server(cmd_data,i,file_list,clnt_file,current_d,length_of_list,length);
-                    }else{
+                    read(i,cmd_data,sizeof(cmd_d));
+                    int c;
+                    write(i,&c,sizeof(int));
+                    read(i,cmd_data->cmd2,sizeof(cmd_data->cmd2));
+                    handlingCmd_server(cmd_data,i,file_list,clnt_file,current_d,length_of_list,length);
+                   
+                    if(!strcmp(cmd_data->cmd1,"exit")){
                         FD_CLR(i,&reads);
                         close(i);
                         printf("closed client: %d\n",i);
