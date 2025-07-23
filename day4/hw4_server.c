@@ -1,32 +1,48 @@
 #include "hw4_lib.h"
 #include <pthread.h>
 #define MAX_CLNT 256
+#define ALPHABET 26
 
 typedef struct 
 {   
-    int num_s_word;
+    unsigned int num_s_word;
     char search_word[MAX][BUF_SIZE];
-    int search_num;
+    unsigned int search_num;
 }search_d;
+
+typedef struct trie_d
+{
+    unsigned int isLeaf;
+    struct trie_d *children[ALPHABET];
+}trie_d;
+
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int clnt_cnt = 0;
 int clnt_socks[MAX_CLNT];
+trie_d *root;
+int s_num = 0;
+search_d **search_data;
 
 void *handle_clnt(void *arg);
+struct trie_d *newNode();
+char capitalConvert(char c);
+char *capitalStrConvert(char *str);
+void insert(char* str);
+int search(char *str);
 
 int main(int argc, char *argv[]){
     //변수 선언
     FILE *fp;
     char buf[BUF_SIZE];
-    search_d **search_data;
-    int s_num = 0,option = 1;
+    int option = 1;
     int serv_sock,clnt_sock;
     struct sockaddr_in serv_addr,clnt_addr;
     socklen_t clnt_addr_size;
     pthread_t t_id;
     //동적메모리할당
     search_data = calloc(MAX,sizeof(search_d*));
+    root = newNode();
     // command line 인자 확인 
     if(argc != 3){
         printf("Usage: %s <port> <file>\n",argv[0]);
@@ -54,6 +70,11 @@ int main(int argc, char *argv[]){
         search_data[s_num++]->num_s_word = i;
     }
     memset(buf,0,BUF_SIZE);
+    // trie list 구성
+    for(int i=0; i < s_num; i++){
+        for(int j=0; j<search_data[i]->num_s_word; j++)
+            insert(search_data[i]->search_word[j]);
+    }
     // TCP server socket start
     serv_sock = socket(PF_INET,SOCK_STREAM,0);
     if(serv_sock == -1)
@@ -95,8 +116,34 @@ int main(int argc, char *argv[]){
 void *handle_clnt(void *arg){
     int clnt_sock = *((int *)arg);
     char msg[BUF_SIZE];
+    char tmp[BUF_SIZE];
+    int len,end = -1;
+    char verify;
     read(clnt_sock,msg,sizeof(msg));
-
+    int result = search(msg);
+    write(clnt_sock,&result,sizeof(int));
+    if(result == -1){
+        //to do
+    }else{
+        for(int i=0; i<s_num; i++){
+            for(int j=0; j<search_data[i]->num_s_word; j++){
+                char *s_word_temp = capitalStrConvert(search_data[i]->search_word[j]);
+                char *msg_temp = capitalStrConvert(msg);
+                if(!strcmp(s_word_temp,msg_temp)){
+                    write(clnt_sock,&search_data[i]->num_s_word,sizeof(unsigned int));
+                    for(int z=0; z<search_data[i]->num_s_word; z++){
+                        strcpy(tmp,search_data[i]->search_word[z]);
+                        len = strlen(tmp);
+                        write(clnt_sock,&len,sizeof(int));
+                        read(clnt_sock,&verify,sizeof(char));
+                        write(clnt_sock,tmp,strlen(tmp));
+                        read(clnt_sock,&verify,sizeof(char));
+                    }
+                }
+            }
+        }
+        write(clnt_sock,&end,sizeof(int));
+    }
     pthread_mutex_lock(&mutex);
     for(int i=0; i<clnt_cnt; i++){
         if(clnt_sock == clnt_socks[i])
@@ -112,3 +159,54 @@ void *handle_clnt(void *arg){
     return NULL;
 }
 
+struct trie_d *newNode(){
+    trie_d *node = malloc(sizeof(trie_d));
+    node->isLeaf = 0;
+    for(int i=0; i<ALPHABET; i++){
+        node->children[i] = NULL;
+    }
+    return node;
+}
+
+char *capitalStrConvert(char *str){
+    char *tmp = calloc(strlen(str),sizeof(char));
+    strcpy(tmp,str);
+    for(int i=0; i<strlen(tmp); i++)
+        tmp[i] = capitalConvert(tmp[i]);
+    return tmp;
+}
+
+char capitalConvert(char c){
+    if(c >= 'A' && c <= 'Z') return c - 'A' + 'a';
+    return c;
+}
+
+void insert(char *str){
+    trie_d *current = root;
+    int i = 0;
+    while (str[i] != '\0')
+    {
+        char c = capitalConvert(str[i]);
+        int index = c - 'a';
+        if(current->children[index] == NULL)
+            current->children[index] = newNode();
+        current = current->children[index];
+        i++;
+    }
+    current->isLeaf = 1;
+}
+
+int search(char *str){
+    trie_d *current = root;
+    int i = 0;
+    while (str[i] != '\0')
+    {
+        char c = capitalConvert(str[i]);
+        int index = c - 'a';
+        if(current->children[index] == NULL)
+            return -1;
+        current = current->children[index];
+        i++;
+    }
+    return current->isLeaf;
+}
