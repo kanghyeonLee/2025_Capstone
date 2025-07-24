@@ -3,13 +3,6 @@
 #define MAX_CLNT 256
 #define ALPHABET 26
 
-typedef struct 
-{   
-    unsigned int num_s_word;
-    char search_word[MAX][BUF_SIZE];
-    unsigned int search_num;
-}search_d;
-
 typedef struct trie_d
 {
     unsigned int isLeaf;
@@ -70,6 +63,8 @@ int main(int argc, char *argv[]){
         search_data[s_num++]->num_s_word = i;
     }
     memset(buf,0,BUF_SIZE);
+    //내림차순 정렬
+    merge_sort(search_data,0,s_num-1);
     // trie list 구성
     for(int i=0; i < s_num; i++){
         for(int j=0; j<search_data[i]->num_s_word; j++)

@@ -7,6 +7,15 @@
 #include <sys/types.h>
 
 #define BUF_SIZE 1024
-#define MAX 100
+#define MAX 30
+
+typedef struct 
+{   
+    unsigned int num_s_word;
+    char search_word[MAX][BUF_SIZE];
+    unsigned int search_num;
+}search_d;
 
 void error_handling(char *msg);
+void merge(search_d** search_data, int left, int mid, int right);
+void merge_sort(search_d** search_data, int left, int right);

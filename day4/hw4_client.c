@@ -31,6 +31,7 @@ int main(int argc, char *argv[]){
     if(result == -1){
         printf("No search data...\n");
     }else{
+        printf("-----------------------------\n");
         while(1)
         {
             read(sock,&num_s_word,sizeof(int));
