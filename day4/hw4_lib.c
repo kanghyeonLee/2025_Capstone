@@ -41,3 +41,16 @@ void merge_sort(search_d** search_data, int left, int right){
     merge(search_data, left, mid, right);
   }
 }
+
+char *capitalStrConvert(char *str){
+    char *tmp = calloc(strlen(str),sizeof(char));
+    strcpy(tmp,str);
+    for(int i=0; i<strlen(tmp); i++)
+        tmp[i] = capitalConvert(tmp[i]);
+    return tmp;
+}
+
+char capitalConvert(char c){
+    if(c >= 'A' && c <= 'Z') return c - 'A' + 'a';
+    return c;
+}

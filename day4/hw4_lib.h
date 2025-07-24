@@ -19,3 +19,5 @@ typedef struct
 void error_handling(char *msg);
 void merge(search_d** search_data, int left, int mid, int right);
 void merge_sort(search_d** search_data, int left, int right);
+char capitalConvert(char c);
+char *capitalStrConvert(char *str);

@@ -1,4 +1,5 @@
 #include "hw4_lib.h"
+#define COLOR_RESET "\033[0m"
 
 int main(int argc, char *argv[]){
     //변수 선언
@@ -42,7 +43,9 @@ int main(int argc, char *argv[]){
                 write(sock,&verify,sizeof(char));
                 read(sock,tmp,sizeof(tmp));
                 write(sock,&verify,sizeof(char));
-                printf("%s ",tmp);
+                char *compare_str =capitalStrConvert(tmp);
+                if(!strcmp(compare_str,buf)) printf("\033[38;2;252;127;0m%s %s",tmp,COLOR_RESET);
+                else printf("%s ",tmp);
             }
             printf("\n");
         }

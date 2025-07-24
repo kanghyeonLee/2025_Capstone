@@ -151,6 +151,7 @@ void *handle_clnt(void *arg){
     clnt_cnt--;
     pthread_mutex_unlock(&mutex);
     close(clnt_sock);
+    printf("Closed client %d\n",clnt_sock);
     return NULL;
 }
 
@@ -161,19 +162,6 @@ struct trie_d *newNode(){
         node->children[i] = NULL;
     }
     return node;
-}
-
-char *capitalStrConvert(char *str){
-    char *tmp = calloc(strlen(str),sizeof(char));
-    strcpy(tmp,str);
-    for(int i=0; i<strlen(tmp); i++)
-        tmp[i] = capitalConvert(tmp[i]);
-    return tmp;
-}
-
-char capitalConvert(char c){
-    if(c >= 'A' && c <= 'Z') return c - 'A' + 'a';
-    return c;
 }
 
 void insert(char *str){
