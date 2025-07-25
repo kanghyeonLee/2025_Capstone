@@ -54,3 +54,26 @@ char capitalConvert(char c){
     if(c >= 'A' && c <= 'Z') return c - 'A' + 'a';
     return c;
 }
+
+int get_key(int key){
+  int ch;
+  struct termios old;
+  struct termios current;
+  tcgetattr(0,&old);
+  current = old;
+  current.c_lflag &= ~ICANON;
+  if(key){
+    current.c_lflag |= ECHO;
+  }else{
+    current.c_lflag &= ~ECHO;
+  }
+  current.c_cc[VMIN] = 1;
+  cfmakeraw(&current);
+  tcsetattr(0,TCSANOW,&current);
+  ch = getchar();
+  tcsetattr(0,TCSANOW,&old);
+
+  return ch;
+}
+
+

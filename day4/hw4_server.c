@@ -110,41 +110,54 @@ int main(int argc, char *argv[]){
 
 void *handle_clnt(void *arg){
     int clnt_sock = *((int *)arg);
-    char msg[BUF_SIZE];
-    char tmp[BUF_SIZE];
-    int len,end = -1;
+    char msg[BUF_SIZE],tmp[BUF_SIZE];
+    int len,response, end = -1,empty,flag = 1;
     char verify;
-    read(clnt_sock,msg,sizeof(msg));
-    int result = search(msg);
-    write(clnt_sock,&result,sizeof(int));
-    if(result == -1){
-        //to do
-    }else{
-        for(int i=0; i<s_num; i++){
-            for(int j=0; j<search_data[i]->num_s_word; j++){
-                char *s_word_temp = capitalStrConvert(search_data[i]->search_word[j]);
-                char *msg_temp = capitalStrConvert(msg);
-                if(!strcmp(s_word_temp,msg_temp)){
-                    write(clnt_sock,&search_data[i]->num_s_word,sizeof(unsigned int));
-                    for(int z=0; z<search_data[i]->num_s_word; z++){
-                        strcpy(tmp,search_data[i]->search_word[z]);
-                        len = strlen(tmp);
-                        write(clnt_sock,&len,sizeof(int));
-                        read(clnt_sock,&verify,sizeof(char));
-                        write(clnt_sock,tmp,strlen(tmp));
-                        read(clnt_sock,&verify,sizeof(char));
+    while (flag)
+    {
+        read(clnt_sock,&empty,sizeof(int));
+        write(clnt_sock,&response,sizeof(int));
+        if(!empty){
+            flag = read(clnt_sock,msg,sizeof(msg));
+        }
+        int result = search(msg);
+        if(empty){
+            result = -1;
+        }
+        write(clnt_sock,&result,sizeof(int));
+        read(clnt_sock,&response,sizeof(int));
+        if(result != -1){
+            for(int i=0; i<s_num; i++){
+                for(int j=0; j<search_data[i]->num_s_word; j++){
+                    char *s_word_temp = capitalStrConvert(search_data[i]->search_word[j]);
+                    char *msg_temp = capitalStrConvert(msg);
+                    if(strstr(s_word_temp,msg_temp)){
+                        write(clnt_sock,&search_data[i]->num_s_word,sizeof(unsigned int));
+                        for(int z=0; z<search_data[i]->num_s_word; z++){
+                            strcpy(tmp,search_data[i]->search_word[z]);
+                            len = strlen(tmp);
+                            write(clnt_sock,&len,sizeof(int));
+                            read(clnt_sock,&verify,sizeof(char));
+                            write(clnt_sock,tmp,strlen(tmp));
+                            read(clnt_sock,&verify,sizeof(char));
+                        }
+                        break;
                     }
                 }
             }
+            write(clnt_sock,&end,sizeof(int));
         }
-        write(clnt_sock,&end,sizeof(int));
+        memset(msg,0,strlen(msg));
     }
+    
     pthread_mutex_lock(&mutex);
     for(int i=0; i<clnt_cnt; i++){
         if(clnt_sock == clnt_socks[i])
         {
-            while (i++<clnt_cnt-1)
+            while (i<clnt_cnt-1){
                 clnt_socks[i] = clnt_socks[i+1];
+                i++;
+            }
             break;
         }
     }

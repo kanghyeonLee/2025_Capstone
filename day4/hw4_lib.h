@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <termios.h>
 
 #define BUF_SIZE 1024
 #define MAX 30
@@ -21,3 +22,4 @@ void merge(search_d** search_data, int left, int mid, int right);
 void merge_sort(search_d** search_data, int left, int right);
 char capitalConvert(char c);
 char *capitalStrConvert(char *str);
+int get_key(int key);
