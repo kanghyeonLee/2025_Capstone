@@ -35,6 +35,7 @@ int main(int argc, char *argv[]){
         printf("\n-----------------------------\n\r");
         printf("\x1b[%dA\x1b[%dC",2,13);
         c = get_key(0);
+        int empty = 0;
         if(c == 8 || c == 127){
             if(i > 0){
                 memset(buf_temp,0,sizeof(buf_temp));
@@ -43,11 +44,14 @@ int main(int argc, char *argv[]){
                 strcpy(buf,buf_temp);
                 i--;
             }
+        }else if(c == 3){
+            empty = -1;
+            write(sock,&empty,sizeof(int));
+            break;
         }
         else if(c >= 31 && c <= 126){
             buf[i++] = c;
         }
-        int empty = 0;
         if(i == 0) empty = 1;
         write(sock,&empty,sizeof(int));
         read(sock,&request,sizeof(int));

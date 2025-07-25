@@ -97,7 +97,6 @@ int main(int argc, char *argv[]){
         pthread_detach(t_id);
         printf("Connected client %d\n",clnt_sock);
     }
-
     //end
     // 메모리 할당해제 및 파일 닫기
     close(serv_sock);
@@ -111,14 +110,15 @@ int main(int argc, char *argv[]){
 void *handle_clnt(void *arg){
     int clnt_sock = *((int *)arg);
     char msg[BUF_SIZE],tmp[BUF_SIZE];
-    int len,response, end = -1,empty,flag = 1;
+    int len,response, end = -1,empty;
     char verify;
-    while (flag)
+    while (1)
     {
         read(clnt_sock,&empty,sizeof(int));
+        if(empty == -1) break;
         write(clnt_sock,&response,sizeof(int));
         if(!empty){
-            flag = read(clnt_sock,msg,sizeof(msg));
+            read(clnt_sock,msg,sizeof(msg));
         }
         int result = search(msg);
         if(empty){
@@ -127,7 +127,9 @@ void *handle_clnt(void *arg){
         write(clnt_sock,&result,sizeof(int));
         read(clnt_sock,&response,sizeof(int));
         if(result != -1){
+            int cnt = 0;
             for(int i=0; i<s_num; i++){
+                if(cnt == 10) break;
                 for(int j=0; j<search_data[i]->num_s_word; j++){
                     char *s_word_temp = capitalStrConvert(search_data[i]->search_word[j]);
                     char *msg_temp = capitalStrConvert(msg);
@@ -141,6 +143,7 @@ void *handle_clnt(void *arg){
                             write(clnt_sock,tmp,strlen(tmp));
                             read(clnt_sock,&verify,sizeof(char));
                         }
+                        cnt++;
                         break;
                     }
                 }
