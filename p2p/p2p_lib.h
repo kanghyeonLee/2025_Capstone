@@ -2,12 +2,23 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <netdb.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
 
 #define BUF_SIZE 1024
+#define SENDING_PEER 1
+#define RECEIVING_PEER 0
+#define MAX_CLNT 256
 
 typedef struct 
 {
-    int peer_flag; // 0은 receiving peer, 1은 sending peer
+    int peer_flag;
     int max_num_rp;
     char *file_name;
     int segment_size;
@@ -16,4 +27,14 @@ typedef struct
     int sending_port;
 }peer_d;
 
+typedef struct 
+{
+    int id;
+    char ip_address[16];
+    int port;
+}recv_d;
+
 void optargHandler(int argc, char *argv[], peer_d* peer);
+void error_handling(char *msg);
+void *connectRecv(void *arg);
+void getIpAddress(char *recv_host);

@@ -7,10 +7,10 @@ void optargHandler(int argc, char *argv[],peer_d *peer){
         switch (opt)
         {
         case 's':
-            peer->peer_flag = 1;
+            peer->peer_flag = SENDING_PEER;
             break;
         case 'r':
-            peer->peer_flag = 0;
+            peer->peer_flag = RECEIVING_PEER;
             break;
         case 'n':
             if(peer->peer_flag) peer->max_num_rp = atoi(optarg);
@@ -51,4 +51,30 @@ void optargHandler(int argc, char *argv[],peer_d *peer){
             break;
         }
     }
+}
+
+void error_handling(char *msg){
+    perror(msg);
+    exit(1);
+}
+
+void getIpAddress(char *recv_host){
+    struct ifaddrs *ifaddr, *temp;
+    int family,info;
+    char host[NI_MAXHOST];
+    if(getifaddrs(&ifaddr) == -1)
+        error_handling("getifaddrs() error");
+    for(temp = ifaddr; temp != NULL; temp = temp->ifa_next){
+        if(temp->ifa_addr == NULL)
+            continue;
+        family = temp->ifa_addr->sa_family;
+        if(family == AF_INET){
+            info = getnameinfo(temp->ifa_addr,sizeof(struct sockaddr_in),host,NI_MAXHOST,NULL,0,NI_NUMERICHOST);
+            if(info != 0)
+                error_handling("getnameinfo() error");
+            if(strcmp(temp->ifa_name,"lo"))
+                strcpy(recv_host,host);
+        }
+    }
+    freeifaddrs(ifaddr);
 }
