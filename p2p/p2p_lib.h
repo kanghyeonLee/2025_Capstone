@@ -10,6 +10,8 @@
 #include <netdb.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
+#include <sys/time.h>
+#include <sys/select.h>
 
 #define BUF_SIZE 1024
 #define SENDING_PEER 1
@@ -36,5 +38,7 @@ typedef struct
 
 void optargHandler(int argc, char *argv[], peer_d* peer);
 void error_handling(char *msg);
-void *connectRecv(void *arg);
 void getIpAddress(char *recv_host);
+void *connectOtherRecv(void *arg);
+void *sendRecvData(void *arg);
+void *readDataFromRecv(void *arg);
