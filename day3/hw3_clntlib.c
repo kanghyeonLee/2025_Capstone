@@ -6,10 +6,12 @@ void error_handling(char *message){
 }
 
 void printFileList(pkt_t **file_list, int length, int sock){
+    char ack;
     printf("\nThe File List of %d Server\n",sock);
    
     for(int i=0; i<length; i++){
         read(sock,file_list[i],sizeof(pkt_t));
+        write(sock,&ack,sizeof(char));
     }
     for(int i=0; i<length; i++){
         if(!file_list[i]->directory)
@@ -37,7 +39,7 @@ int handlingCmd_client(char *cmd, cmd_d* cmd_data){
         cmd_data->mode = 5;
         strcpy(cmd_data->cmd1,cmd);
     }
-    else{
+    else if(strstr(cmd," ")){
         char tmp_cmd[BUF_SIZE];
         strcpy(tmp_cmd,cmd);
         char *tmp = strtok(tmp_cmd," ");
@@ -49,6 +51,8 @@ int handlingCmd_client(char *cmd, cmd_d* cmd_data){
         }else if(!strcmp(cmd_data->cmd1,"dfile")){
             cmd_data->mode = 4;
         }else cmd_data->mode = -1;
+    }else{
+        error_handling("wrong cmd!");
     }
     return cmd_data->mode;
 }
@@ -83,7 +87,7 @@ int dfile_func(int sock, cmd_d *cmd_data, pkt_t**file_list){
     read(sock,&file_size,sizeof(unsigned int));
     if(file_size == -1) return 0;
     int index = atoi(cmd_data->cmd2);
-    char name[BUF_SIZE] = "tmp_";
+    char name[BUF_SIZE] = "down_";
     strcat(name,file_list[index-1]->file_name);
     FILE *fp = fopen(name,"wb");
     if(fp == NULL)
@@ -102,14 +106,17 @@ int dfile_func(int sock, cmd_d *cmd_data, pkt_t**file_list){
 }
 
 void ufile_func(int clnt_file_length,pkt_t** clnt_file,int sock){
+    char ack;
     clnt_file_length = viewFileList_client(clnt_file);
     printf("\nThe File List of Local\n");
     for(int i=0; i<clnt_file_length; i++){
         printf("%d. %s %dbytes\n",i+1,clnt_file[i]->file_name,clnt_file[i]->file_size);
     }
     write(sock,&clnt_file_length,sizeof(int));
-    for(int j=0; j<clnt_file_length; j++)
+    for(int j=0; j<clnt_file_length; j++){
+        read(sock,&ack,sizeof(char));
         write(sock,clnt_file[j],sizeof(pkt_t));
+    }
     int clnt_index;
     do{
     printf("\nPlease enter the appropriate index : ");

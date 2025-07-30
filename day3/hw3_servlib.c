@@ -13,7 +13,7 @@ int viewFileList_server(int clnt_sock, pkt_t **send_pkt, char current_d[BUF_SIZE
         error_handling("opendir() error");
     while ((d = readdir(dp)) != NULL)
     {
-        char name[BUF_SIZE];
+        char name[BUF_SIZE*2+1];
         sprintf(name,"%s/%s",current_d[clnt_sock],d->d_name);
         if(!strcmp(d->d_name,".") || !strcmp(d->d_name,".."))
             continue;
@@ -34,6 +34,7 @@ int viewFileList_server(int clnt_sock, pkt_t **send_pkt, char current_d[BUF_SIZE
 
 void handlingCmd_server(cmd_d* data, int i,pkt_t **file_list,pkt_t **clnt_file,char current_d[BUF_SIZE][BUF_SIZE], int *length_of_list, int *length){
     char result[BUF_SIZE];
+    char ack;
     if(data->mode == 0){
         strcpy(result,"\n\tcd <directory>: change current directory to <directory>\n\tls : print file list from current directory\n\tdfile <file index num>: download file for index\n\tufile: upload file from my current directory\n\n");
         write(i,result,BUF_SIZE);
@@ -49,18 +50,21 @@ void handlingCmd_server(cmd_d* data, int i,pkt_t **file_list,pkt_t **clnt_file,c
         read(i,&c,sizeof(c));
         for(int j=0; j<*length_of_list; j++){
             write(i,file_list[j],sizeof(pkt_t));
+            read(i,&ack,sizeof(char));
         }
 
     }
     else{
-        if(data->mode == 3){
+        if(data->mode == 3){ 
             if(!strcmp(data->cmd2,"")){
                 strcpy(result,"Change Directory Fail..\n");
             }else{
                 if(strlen(data->cmd2) >=2){
                     if(current_d[i][strlen(current_d[i])-1] == '/') current_d[i][strlen(current_d[i])-1] = '\0';
+                    char temp[strlen(current_d[i])+1];
+                    strcpy(temp,current_d[i]);
                     if(strstr(data->cmd2,"../") != NULL){
-                        sprintf(current_d[i],"%s/%s",current_d[i],data->cmd2);
+                        sprintf(current_d[i],"%s/%s",temp,data->cmd2);
                     }else if(data->cmd2[0] == '.' && data->cmd2[1] == '/'){
                         char tmp[BUF_SIZE];
                         for(int j=1; j<strlen(data->cmd2); j++)
@@ -69,7 +73,7 @@ void handlingCmd_server(cmd_d* data, int i,pkt_t **file_list,pkt_t **clnt_file,c
                     }else if(data->cmd2[0] == '/'){
                         strcpy(current_d[i],data->cmd2);
                     }else{
-                        sprintf(current_d[i],"%s/%s",current_d[i],data->cmd2);
+                        sprintf(current_d[i],"%s/%s",temp,data->cmd2);
                     }
                 }else{
                     if(data->cmd2[0] == '/'){
@@ -116,14 +120,16 @@ void handlingCmd_server(cmd_d* data, int i,pkt_t **file_list,pkt_t **clnt_file,c
             }
         }else if(data->mode == 5){
             read(i,length,sizeof(int));
+            char ack;
             for(int j=0; j<*length; j++){
+                write(i,&ack,sizeof(char));
                 read(i,clnt_file[j],sizeof(pkt_t));
             }
-            char tmp[BUF_SIZE];
+            char tmp[BUF_SIZE*3];
             int index;
             read(i,&index,sizeof(int));
             strcat(tmp,clnt_file[index-1]->file_name);
-            sprintf(tmp,"%s/temp_%s",current_d[i],clnt_file[index-1]->file_name);
+            sprintf(tmp,"%s/upload_%s",current_d[i],clnt_file[index-1]->file_name);
             FILE *fp = fopen(tmp,"wb");
             if(fp == NULL)
                 error_handling("fopen error()");
