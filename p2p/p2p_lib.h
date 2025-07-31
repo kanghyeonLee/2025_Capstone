@@ -15,6 +15,7 @@
 #include <dirent.h>
 
 #define KB 1024
+#define FILE_LENGTH 100
 #define SENDING_PEER 1
 #define RECEIVING_PEER 0
 #define MAX_CLNT 256
@@ -24,7 +25,7 @@ typedef struct
     int peer_flag;
     int max_num_rp;
     char *file_name;
-    int segment_size;
+    size_t segment_size;
     int listen_port;
     char *sending_ip_address;
     int sending_port;
@@ -39,15 +40,15 @@ typedef struct
 
 typedef struct 
 {
-    int segment_size;
+    size_t segment_size;
     char *segment;
 }seg_d;
 
 typedef struct 
 {
-    int file_size;
-    int segment_size;
-    char filename[KB];
+    size_t file_size;
+    size_t segment_size;
+    char filename[FILE_LENGTH];
 }file_d;
 
 
@@ -60,3 +61,5 @@ void *sendRecvData(void *arg);
 void *readDataFromRecv(void *arg);
 void *recvSegmentToMe(void *arg);
 void *sendFileData(void *arg);
+void *showProgressBar(void *arg);
+void *showSendingProgressBar(void *arg);

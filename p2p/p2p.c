@@ -8,23 +8,26 @@ int num_recv_peer;
 recv_d *recv_set;
 int id = 0;
 FILE *fp;
-int size;
-int total_file_size;
+size_t size;
+size_t total_file_size;
 file_d file;
-int total_segment_num;
-int final_segment_size;
+size_t total_segment_num;
+size_t final_segment_size;
+size_t *current_bytes;
+double *time_array;
+double now;
 
 int main(int argc, char *argv[]){
     //변수 선언
     peer_d *peer = calloc(1,sizeof(peer_d));
-    //명령줄 인자 다루는 과정
+    //명령줄 인자 다루는 과정 
     optargHandler(argc,argv,peer);
     num_recv_peer = peer->max_num_rp;
     recv_set = calloc(num_recv_peer,sizeof(recv_d));
-    size = peer->segment_size*KB;
     //Sendig Peer part
     if(peer->peer_flag == SENDING_PEER){
         //sending peer 변수 선언
+        size = peer->segment_size*KB;
         pthread_t t_id[num_recv_peer];
         int serv_sock,clnt_sock;
         int i,option = 1;
@@ -125,6 +128,11 @@ int main(int argc, char *argv[]){
         final_segment_size = total_file_size % size;
         if(final_segment_size != 0) total_segment_num ++;
         int read_len = 0,write_len;
+        current_bytes = calloc(num_recv_peer,sizeof(size_t));
+        time_array = calloc(num_recv_peer,sizeof(double));
+        struct timeval tv;
+        pthread_t show_progress_tid;
+        pthread_create(&show_progress_tid,NULL,showSendingProgressBar,NULL);
         for(i=0; i<total_segment_num; i++){
             char segment[size];
             if(i < total_segment_num - 1) read_len = fread(segment,sizeof(char),size, fp);
@@ -138,13 +146,12 @@ int main(int argc, char *argv[]){
             {
                 write_len += write(clnt_socks[i%num_recv_peer],segment,read_len*sizeof(char));
             }
+            gettimeofday(&tv,NULL);
+            time_array[i%num_recv_peer] = tv.tv_sec + tv.tv_usec/1000000.0 - now;
+            current_bytes[i%num_recv_peer] += (size_t)write_len;
             read(clnt_socks[i%num_recv_peer],&ack,sizeof(char));
         }
-        
-        printf("Sending Peer [");
-        for(i = 0; i < 25; i++){
-
-        }
+        pthread_join(show_progress_tid,NULL);
         cnt = 0;
         while (cnt < num_recv_peer)
         {
@@ -240,14 +247,18 @@ int main(int argc, char *argv[]){
         pthread_join(t_id,NULL);
         write(sock,&ack,sizeof(char));
         //데이터 송신
+        struct timeval tv;
+
         read(sock,&file,sizeof(file_d));
-        char temp[KB]; 
+        char temp[FILE_LENGTH]; 
         write(sock,&ack,sizeof(char));
-        read(sock,temp,sizeof(char)*KB);
+        read(sock,temp,sizeof(char)*FILE_LENGTH);
         strcpy(file.filename,temp);
         size = file.segment_size;
         total_file_size = file.file_size;
-        char file_name[KB+10];
+        char file_name[3*FILE_LENGTH], dirname[FILE_LENGTH];
+        sprintf(dirname,"/tmp/%d",my_recv.id);
+        mkdir(dirname,0755);
         total_segment_num = total_file_size / size;
         final_segment_size = total_file_size % size;
         if(final_segment_size != 0) total_segment_num ++;
@@ -263,7 +274,9 @@ int main(int argc, char *argv[]){
         int read_len,total_read_size=0,write_len;
         int len;
         char segment[size];
-        for(i=my_recv.id; i<total_segment_num; i+=num_recv_peer){   
+        pthread_t show_progress_tid;
+        pthread_create(&show_progress_tid,NULL,showProgressBar,&my_recv.id);
+        for(i=my_recv.id; i<total_segment_num; i+=num_recv_peer){
             read(sock,&total_read_size,sizeof(int));
             read_len = 0, len = 0;
             while (read_len < total_read_size)
@@ -272,7 +285,10 @@ int main(int argc, char *argv[]){
                 if(len < 0) error_handling("read() error");
                 read_len += len;
             }
-            sprintf(file_name,"/tmp/%d/%s_%d",my_recv.id,file.filename,i);
+            gettimeofday(&tv,NULL);
+            time_array[my_recv.id] = tv.tv_sec + tv.tv_usec/1000000.0 - now;
+            current_bytes[my_recv.id] += (size_t)read_len;
+            sprintf(file_name,"%s/%s_%d",dirname,file.filename,i);
             FILE *fp = fopen(file_name,"wb");
             if(fp == NULL)
                 error_handling("fopen() error");
@@ -303,14 +319,27 @@ int main(int argc, char *argv[]){
         for(i=0; i<num_recv_peer; i++){
             if(i != my_recv.id) pthread_join(recv_tid[i],NULL);
         }
-        sprintf(file_name,"%s_%d",file.filename,my_recv.id);
+        pthread_join(show_progress_tid,NULL);
+        for(i=0; i<num_recv_peer; i++){
+            if(i != my_recv.id){
+                close(clnt_socks[i]);
+                close(send_other_socks[i]);
+            }
+            else close(my_serv_sock);
+        }
+        close(sock);
+
+        sprintf(file_name,"%d_%s",my_recv.id,file.filename);
         FILE *fp = fopen(file_name,"wb");
         if(fp == NULL) error_handling("fopen error()");
         for(i=0; i<total_segment_num; i++){
-            char tmp_file[KB+10];
+            printf("Download (%d/%zu)\n",i,total_segment_num-1);
+            printf ("\x1b[%dA\r",1);
+            fflush(stdout);
+            char tmp_file[3*FILE_LENGTH];
             char segment[size];
             read_len = 0, len = 0;
-            sprintf(tmp_file,"/tmp/%d/%s_%d",my_recv.id,file.filename,i);
+            sprintf(tmp_file,"%s/%d_%s",dirname,i,file.filename);
             FILE *tmp = fopen(tmp_file,"rb");
             if(tmp == NULL) error_handling("fopen() error");
             if(i < total_segment_num - 1){
@@ -343,17 +372,10 @@ int main(int argc, char *argv[]){
             }
             fclose(tmp);
             remove(tmp_file);
+            rmdir(dirname);
         }
+        printf("\n");
         fclose(fp);
-
-        for(i=0; i<num_recv_peer; i++){
-            if(i != my_recv.id){
-                close(clnt_socks[i]);
-                close(send_other_socks[i]);
-            }
-            else close(my_serv_sock);
-        }
-        close(sock);
        
     }
 
@@ -417,7 +439,8 @@ void *recvSegmentToMe(void *arg){
     char segment[size],ack;
     int i;
     int my_id = ((int*)arg)[1];
-    char file_name[KB+10];
+    struct timeval tv;
+    char file_name[3*FILE_LENGTH];
     for(i = index; i < total_segment_num; i+=num_recv_peer){
         read(clnt_sock,&total_size,sizeof(int));
         write(clnt_sock,&ack,sizeof(char));
@@ -429,7 +452,10 @@ void *recvSegmentToMe(void *arg){
            if(len < 0) error_handling("read() error");
            read_len += len;
         }
-        sprintf(file_name,"/tmp/%d/%s_%d",my_id,file.filename,i);
+        gettimeofday(&tv,NULL);
+        time_array[index] = tv.tv_sec + tv.tv_usec/1000000.0 - now;
+        current_bytes[index] += (size_t)read_len;
+        sprintf(file_name,"/tmp/%d/%d_%s",my_id,i,file.filename);
         FILE *fp = fopen(file_name,"wb");
         if(fp == NULL){
             printf("%s\n",file_name);
@@ -446,5 +472,93 @@ void *recvSegmentToMe(void *arg){
         write(clnt_sock,&ack,sizeof(char));
     }
     free(arg);
+    return NULL;
+}
+
+
+void *showProgressBar(void *arg){
+    int id = *((int *)arg);
+    int percent = 0,current_shop = 0;
+    size_t total_current_bytes = 0;
+    double throughput = 0, total_time = 0;
+    int i,j;
+    struct timeval tv;
+    current_bytes = calloc(num_recv_peer,sizeof(size_t));
+    time_array = calloc(num_recv_peer,sizeof(double));
+    gettimeofday(&tv,NULL);
+    now = tv.tv_usec/1000000.0 + tv.tv_sec;
+    while(percent < 100)
+    {
+        percent = (((double)total_current_bytes)/(double)total_file_size) * 100;
+        current_shop = percent/4;
+        throughput = (total_current_bytes/1000000.0)/total_time;
+        total_current_bytes = 0;
+        total_time = 0;
+        for(j=0; j<num_recv_peer; j++){
+            total_current_bytes += current_bytes[j];
+            total_time += time_array[j];
+        }
+        printf("Receiving Peer %d [",id+1);
+        for(j = 0; j < 25; j++){
+            if(j <= current_shop)
+                printf("#");
+            else printf(" ");
+        }
+        printf("] %d%% (%zu/%zuBytes) %.2fMbps (%.1fs)\n",percent,total_current_bytes,total_file_size,throughput,total_time);
+        double throughput_recv = ((double)current_bytes[id]/1000000.0)/time_array[id];
+        printf("From Sending Peer : %.2fMbps (%zu Bytes Sent / %.1fs)\n",throughput_recv,current_bytes[id],time_array[id]);
+        for(j = 0; j < num_recv_peer; j++){
+            if(j == id) continue;
+            double throughput_recv = ((double)current_bytes[j]/1000000.0)/time_array[j];
+            printf("From Receiving Peer #%d : %.2fMbps (%zu Bytes Sent / %.1fs)\n",j+1,throughput_recv,current_bytes[j],time_array[j]);
+        }
+        printf ("\x1b[%dA\r", num_recv_peer+1);
+        fflush(stdout);
+        usleep(100);
+    }
+    for(i=0; i<num_recv_peer+1; i++) printf("\n");
+    free(current_bytes);
+    free(time_array);
+    return NULL;
+}
+
+void *showSendingProgressBar(void *arg){
+    int percent = 0,current_shop = 0;
+    size_t total_current_bytes = 0;
+    double throughput = 0, total_time = 0;
+    int i,j;
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    now = tv.tv_usec/1000000.0 + tv.tv_sec;
+    while(percent < 100)
+    {
+        percent = (((double)total_current_bytes)/(double)total_file_size) * 100;
+        current_shop = percent/4;
+        throughput = ((double)total_current_bytes/1000000.0)/total_time;
+        total_current_bytes = 0;
+        total_time = 0;
+        for(j=0; j<num_recv_peer; j++){
+            total_current_bytes += current_bytes[j];
+            total_time += time_array[j];
+        }
+        printf("Sending Peer [");
+        for(j = 0; j < 25; j++){
+            if(j <= current_shop)
+                printf("#");
+            else printf(" ");
+        }
+        printf("] %d%% (%zu/%zuBytes) %.2fMbps (%.1fs)\n",percent,total_current_bytes,total_file_size,throughput,total_time);
+        for(j = 0; j < num_recv_peer; j++){
+            double throughput_recv = ((double)current_bytes[j]/1000000.0)/time_array[j];
+            printf("To Receiving Peer #%d : %.2fMbps (%zu Bytes Sent / %.1fs)\n",j+1,throughput_recv,current_bytes[j],time_array[j]);
+        }
+        printf ("\x1b[%dA\r", num_recv_peer+1);
+        fflush(stdout);
+        usleep(100);
+    
+    }
+    for(i=0; i<num_recv_peer+1; i++) printf("\n");
+    free(current_bytes);
+    free(time_array);
     return NULL;
 }

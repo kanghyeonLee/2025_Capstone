@@ -27,7 +27,7 @@ void optargHandler(int argc, char *argv[],peer_d *peer){
             }
             break;
         case 'g':
-            if(peer->peer_flag) peer->segment_size = atoi(optarg);
+            if(peer->peer_flag) peer->segment_size = (size_t)atoi(optarg);
             else{
                 printf("This '%c' option is only for sending peer.\n",optopt);
                 exit(1);
