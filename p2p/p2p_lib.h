@@ -12,8 +12,9 @@
 #include <netinet/in.h>
 #include <sys/time.h>
 #include <sys/select.h>
+#include <dirent.h>
 
-#define BUF_SIZE 1024
+#define KB 1024
 #define SENDING_PEER 1
 #define RECEIVING_PEER 0
 #define MAX_CLNT 256
@@ -36,9 +37,26 @@ typedef struct
     int port;
 }recv_d;
 
+typedef struct 
+{
+    int segment_size;
+    char *segment;
+}seg_d;
+
+typedef struct 
+{
+    int file_size;
+    int segment_size;
+    char filename[KB];
+}file_d;
+
+
+
 void optargHandler(int argc, char *argv[], peer_d* peer);
 void error_handling(char *msg);
 void getIpAddress(char *recv_host);
 void *connectOtherRecv(void *arg);
 void *sendRecvData(void *arg);
 void *readDataFromRecv(void *arg);
+void *recvSegmentToMe(void *arg);
+void *sendFileData(void *arg);
