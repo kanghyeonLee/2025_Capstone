@@ -72,8 +72,9 @@ void getIpAddress(char *recv_host){
             info = getnameinfo(temp->ifa_addr,sizeof(struct sockaddr_in),host,NI_MAXHOST,NULL,0,NI_NUMERICHOST);
             if(info != 0)
                 error_handling("getnameinfo() error");
-            if(strcmp(temp->ifa_name,"lo"))
+            if(!strcmp(temp->ifa_name,"enp94s0f0np0")){
                 strcpy(recv_host,host);
+            }
         }
     }
     freeifaddrs(ifaddr);
